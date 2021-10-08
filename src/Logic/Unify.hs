@@ -1,6 +1,8 @@
+{-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Logic.Unify
   ( UnifyT,
@@ -17,13 +19,14 @@ module Logic.Unify
   )
 where
 
+import Control.Lens (Plated (..), Prism', children, gplate, preview, transformM)
 import Control.Monad.Trans.State
 import Data.Data
 import Data.Functor.Identity
-import Data.Generics.Uniplate.Data
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.Monoid (Any (..))
+import GHC.Generics (Generic)
 
 -- | Unification monad
 newtype UnifyT t m a = UnifyT (StateT (UState t) m a)
@@ -38,14 +41,20 @@ runUnify = runIdentity . runUnifyT
 
 -- | Unification variable
 newtype UVar = UVar Int
-  deriving (Eq, Ord, Show, Data)
+  deriving (Eq, Ord, Show, Data, Generic)
+
+instance Plated UVar where
+  plate = gplate
 
 -- | Class of terms that can be unified
-class (Eq a, Data a) => Unifiable a where
-  -- | Does the term contain a variable?
-  getVar :: a -> Maybe UVar
-  -- | Construct a term that contains a variable
-  constructVar :: UVar -> a
+class (Eq a, Plated a) => Unifiable a where
+  -- | Prism for the constructor that has a variable as an argument
+  _Var :: Prism' a UVar
+
+  -- | Get the index of the constructor of a term
+  constructorIndex :: a -> Int
+  default constructorIndex :: Data a => a -> Int
+  constructorIndex = constrIndex . toConstr
 
 -- | Create a fresh unification variable
 freshUVar :: Monad m => UnifyT t m UVar
@@ -159,11 +168,9 @@ unify' oc t1 t2 = case (matchTerm t1, matchTerm t2) of
 data TermMatch a = MatchVar UVar | MatchConst Int [a]
 
 matchTerm :: Unifiable a => a -> TermMatch a
-matchTerm t = case getVar t of
+matchTerm t = case preview _Var t of
   Just v -> MatchVar v
-  Nothing -> MatchConst termIndex (children t)
-  where
-    termIndex = constrIndex (toConstr t)
+  Nothing -> MatchConst (constructorIndex t) (children t)
 
 occursInTerm :: Unifiable t => Int -> t -> Bool
 occursInTerm i = getAny . occursInTerm' i

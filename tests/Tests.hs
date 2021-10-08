@@ -1,9 +1,14 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Main where
 
-import Data.Data
+import Control.Lens (Plated (..), gplate)
+import Data.Data (Data)
 import Data.Functor.Identity
+import Data.Generics.Sum.Typed
+import GHC.Generics (Generic)
 import Logic.Unify
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -13,12 +18,13 @@ data Term
   | Int Int
   | F1 Term
   | F2 Term Term
-  deriving (Eq, Show, Data)
+  deriving (Eq, Show, Data, Generic)
+
+instance Plated Term where
+  plate = gplate
 
 instance Unifiable Term where
-  getVar (Var v) = Just v
-  getVar _ = Nothing
-  constructVar = Var
+  _Var = _Typed @UVar
 
 main :: IO ()
 main = defaultMain tests
