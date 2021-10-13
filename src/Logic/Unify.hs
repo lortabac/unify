@@ -50,7 +50,7 @@ class Eq t => Unifiable t where
   -- | Does this constructor take a 'UVar' argument?
   getVar :: t -> Maybe UVar
 
-  transformTermM :: Monad m => (t -> MaybeT (UnifyT t m) t) -> t -> MaybeT (UnifyT t m) t
+  transformTermM :: Monad m => (t -> m t) -> t -> m t
 
   termChildren :: t -> [t]
 
