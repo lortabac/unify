@@ -2,7 +2,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TypeApplications #-}
 
 module Logic.Unify
   ( UnifyT,
@@ -14,18 +13,21 @@ module Logic.Unify
     freshUVar,
     freshBoundUVar,
     unify,
-    unifyNoOccursCheck,
+    unifyOccursCheck,
     applyBindings,
   )
 where
 
-import Control.Lens (Plated (..), Prism', children, gplate, preview, transformM)
+import Control.Monad.Trans.Class (MonadTrans(lift))
+import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.State
 import Data.Data
 import Data.Functor.Identity
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.Monoid (Any (..))
+import Data.Set (Set)
+import qualified Data.Set as Set
 import GHC.Generics (Generic)
 
 -- | Unification monad
@@ -43,17 +45,18 @@ runUnify = runIdentity . runUnifyT
 newtype UVar = UVar Int
   deriving (Eq, Ord, Show, Data, Generic)
 
-instance Plated UVar where
-  plate = gplate
-
 -- | Class of terms that can be unified
-class (Eq a, Plated a) => Unifiable a where
-  -- | Prism for the constructor that has a variable as an argument
-  _Var :: Prism' a UVar
+class Eq t => Unifiable t where
+  -- | Does this constructor take a 'UVar' argument?
+  getVar :: t -> Maybe UVar
+
+  transformTermM :: Monad m => (t -> MaybeT (UnifyT t m) t) -> t -> MaybeT (UnifyT t m) t
+
+  termChildren :: t -> [t]
 
   -- | Get the index of the constructor of a term
-  constructorIndex :: a -> Int
-  default constructorIndex :: Data a => a -> Int
+  constructorIndex :: t -> Int
+  default constructorIndex :: Data t => t -> Int
   constructorIndex = constrIndex . toConstr
 
 -- | Create a fresh unification variable
@@ -86,32 +89,42 @@ instance Semigroup (UnificationResult t) where
 instance Monoid (UnificationResult t) where
   mempty = Unified
 
--- | Unify two terms with occurs-check
+-- | Unify two terms without performing the occurs-check
 unify ::
   (Monad m, Unifiable a) =>
   a ->
   a ->
   UnifyT a m (UnificationResult a)
-unify = unify' True
+unify = unify' False
 
--- | Unify two terms without performing the occurs-check
-unifyNoOccursCheck ::
+-- | Unify two terms with the occurs-check
+--   This function is slow.
+--   If possible use 'unify' and let 'applyBindings' detect cyclic terms lazily.
+unifyOccursCheck ::
   (Monad m, Unifiable a) =>
   a ->
   a ->
   UnifyT a m (UnificationResult a)
-unifyNoOccursCheck = unify' False
+unifyOccursCheck = unify' True
 
--- | Apply the current bindings to a term
-applyBindings :: (Monad m, Unifiable t) => t -> UnifyT t m t
-applyBindings = transformM substVar
+
+-- | Apply the current bindings to a term,
+--   returning 'Nothing' in case of a cyclic term.
+applyBindings :: (Monad m, Unifiable t) => t -> UnifyT t m (Maybe t)
+applyBindings = runMaybeT . applyBindings' mempty
+
+applyBindings' :: (Monad m, Unifiable t) => Set Int -> t -> MaybeT (UnifyT t m) t
+applyBindings' vs = transformTermM substVar
   where
     substVar t = case matchTerm t of
       MatchVar (UVar i) -> do
-        b <- lookupBinding i
-        case b of
-          Just t' -> pure t'
-          Nothing -> pure t
+        if Set.member i vs
+          then fail "Cyclic term"
+          else do
+            b <- lift $ lookupBinding i
+            case b of
+              Just t' -> applyBindings' (Set.insert i vs) t'
+              Nothing -> pure t
       _ -> pure t
 
 unify' ::
@@ -168,9 +181,9 @@ unify' oc t1 t2 = case (matchTerm t1, matchTerm t2) of
 data TermMatch a = MatchVar UVar | MatchConst Int [a]
 
 matchTerm :: Unifiable a => a -> TermMatch a
-matchTerm t = case preview _Var t of
+matchTerm t = case getVar t of
   Just v -> MatchVar v
-  Nothing -> MatchConst (constructorIndex t) (children t)
+  Nothing -> MatchConst (constructorIndex t) (termChildren t)
 
 occursInTerm :: Unifiable t => Int -> t -> Bool
 occursInTerm i = getAny . occursInTerm' i
