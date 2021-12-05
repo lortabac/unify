@@ -3,7 +3,9 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -40,11 +42,9 @@ module Logic.Unify
 where
 
 import Control.Applicative (Alternative)
-import Control.Monad (MonadPlus, when)
 import Control.Monad.Logic.Class
-import Control.Monad.Trans.Class (MonadTrans (lift))
+import Control.Monad.State.Strict
 import Control.Monad.Trans.Maybe
-import Control.Monad.Trans.State
 import Data.Data
 import Data.Functor.Identity
 import Data.IntMap (IntMap)
@@ -56,7 +56,12 @@ import GHC.Generics (Generic)
 
 -- | Unification monad
 newtype UnifyT t m a = UnifyT (StateT (UState t) m a)
-  deriving newtype (Functor, Applicative, Monad)
+  deriving newtype (Functor, Applicative, Monad, MonadTrans)
+
+instance MonadState s m => MonadState s (UnifyT t m) where
+  get = lift get
+  put = lift . put
+  state = lift . state
 
 deriving newtype instance MonadPlus m => Alternative (UnifyT t m)
 
