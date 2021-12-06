@@ -11,19 +11,19 @@ unificationTests =
   testGroup
     "Unification"
     [ testCase "var-const" $ do
-        let res = runUnify $ do
+        let res = evalUnify $ do
               x <- Var <$> newVar
               _ <- unify x (Int 1)
               applyBindings x
         res @=? Just (Int 1),
       testCase "mixed-const" $ do
-        let res = runUnify $ do
+        let res = evalUnify $ do
               x <- Var <$> newVar
               _ <- unify (F2 x (Int 2)) (F2 (Int 1) (Int 2))
               applyBindings x
         res @=? Just (Int 1),
       testCase "var-var" $ do
-        let (v1, v2) = runUnify $ do
+        let (v1, v2) = evalUnify $ do
               x <- Var <$> newVar
               y <- Var <$> newVar
               _ <- unify x y
@@ -31,7 +31,7 @@ unificationTests =
               pure (x', y)
         v1 @=? Just v2,
       testCase "aliasing" $ do
-        let res = runUnify $ do
+        let res = evalUnify $ do
               x <- Var <$> newVar
               y <- Var <$> newVar
               _ <- unify x y
@@ -49,7 +49,7 @@ unificationTests =
           x <- Var <$> newVar
           unifyOccursCheck x (F1 x),
       testCase "var-const (lazy occurs)" $ do
-        let res = runUnify $ do
+        let res = evalUnify $ do
               x <- Var <$> newVar
               _ <- unify x (F1 x)
               applyBindings x
@@ -60,7 +60,7 @@ testUnificationFailure ::
   (Eq t, Show t) =>
   UnifyT t Identity (UnificationResult t) ->
   IO ()
-testUnificationFailure m = case runUnify m of
+testUnificationFailure m = case evalUnify m of
   UnificationFailure _ _ -> assertBool "unification failure" True
   r -> assertBool ("unification failure: " <> show r) False
 
@@ -68,6 +68,6 @@ testOccursCheck ::
   (Eq t, Show t) =>
   UnifyT t Identity (UnificationResult t) ->
   IO ()
-testOccursCheck m = case runUnify m of
+testOccursCheck m = case evalUnify m of
   OccursFailure _ _ -> assertBool "occurs failure" True
   r -> assertBool ("occurs failure: " <> show r) False

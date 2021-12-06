@@ -12,8 +12,12 @@
 
 module Logic.Unify
   ( UnifyT,
+    UState (..),
+    emptyUState,
     runUnifyT,
     runUnify,
+    evalUnifyT,
+    evalUnify,
     UVar (..),
     Unifiable (..),
     UnificationResult (..),
@@ -74,12 +78,29 @@ instance (MonadLogic m, MonadPlus m) => MonadLogic (UnifyT t m) where
       Just (x, mx) -> pure $ Just (x, UnifyT mx)
       Nothing -> pure Nothing
 
--- | Run a computation in the unification monad
-runUnifyT :: Monad m => UnifyT t m a -> m a
-runUnifyT (UnifyT m) = evalStateT m emptyUState
+-- | Unification state
+data UState a = UState
+  { bindings :: IntMap (Binding a),
+    counter :: Int
+  }
 
-runUnify :: UnifyT t Identity a -> a
-runUnify = runIdentity . runUnifyT
+emptyUState :: UState a
+emptyUState = UState mempty 0
+
+-- | Run a computation in the unification monad
+evalUnifyT :: Monad m => UnifyT t m a -> m a
+evalUnifyT (UnifyT m) = evalStateT m emptyUState
+
+evalUnify :: UnifyT t Identity a -> a
+evalUnify = runIdentity . evalUnifyT
+
+-- | Run a computation in the unification monad,
+--   with explicit initial and final state
+runUnifyT :: Monad m => UState t -> UnifyT t m a -> m (a, UState t)
+runUnifyT s (UnifyT m) = runStateT m s
+
+runUnify :: UState t -> UnifyT t Identity a -> (a, UState t)
+runUnify s = runIdentity . runUnifyT s
 
 -- | Unification variable
 newtype UVar = UVar Int
@@ -407,14 +428,6 @@ setBinding :: Monad m => UVar -> Binding t -> UnifyT t m ()
 setBinding (UVar v) t =
   UnifyT $
     modify (\s -> s {bindings = IntMap.insert v t (bindings s)})
-
-data UState a = UState
-  { bindings :: IntMap (Binding a),
-    counter :: Int
-  }
-
-emptyUState :: UState a
-emptyUState = UState mempty 0
 
 getUState :: Monad m => UnifyT t m (UState t)
 getUState = UnifyT get
