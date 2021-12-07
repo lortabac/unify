@@ -50,11 +50,9 @@ test-suite unify-tests
   hs-source-dirs:      tests
   build-depends:       base >=4.13.0.0 && <5
                      , unify
-                     , generic-lens
                      , lens
                      , tasty
                      , tasty-hunit
                      , transformers
-                     , uniplate
   default-language:    Haskell2010
   ghc-options:         -Wall

@@ -12,6 +12,7 @@
 
 module Logic.Unify
   ( UnifyT,
+    Unify,
     UState (..),
     emptyUState,
     runUnifyT,
@@ -78,6 +79,8 @@ instance (MonadLogic m, MonadPlus m) => MonadLogic (UnifyT t m) where
       Just (x, mx) -> pure $ Just (x, UnifyT mx)
       Nothing -> pure Nothing
 
+type Unify t a = UnifyT t Identity a
+
 -- | Unification state
 data UState a = UState
   { bindings :: IntMap (Binding a),
@@ -91,7 +94,7 @@ emptyUState = UState mempty 0
 evalUnifyT :: Monad m => UnifyT t m a -> m a
 evalUnifyT (UnifyT m) = evalStateT m emptyUState
 
-evalUnify :: UnifyT t Identity a -> a
+evalUnify :: Unify t a -> a
 evalUnify = runIdentity . evalUnifyT
 
 -- | Run a computation in the unification monad,
@@ -99,7 +102,7 @@ evalUnify = runIdentity . evalUnifyT
 runUnifyT :: Monad m => UState t -> UnifyT t m a -> m (a, UState t)
 runUnifyT s (UnifyT m) = runStateT m s
 
-runUnify :: UState t -> UnifyT t Identity a -> (a, UState t)
+runUnify :: UState t -> Unify t a -> (a, UState t)
 runUnify s = runIdentity . runUnifyT s
 
 -- | Unification variable
