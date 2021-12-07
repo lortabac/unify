@@ -61,7 +61,7 @@ import GHC.Generics (Generic)
 
 -- | Unification monad
 newtype UnifyT t m a = UnifyT (StateT (UState t) m a)
-  deriving newtype (Functor, Applicative, Monad, MonadTrans)
+  deriving newtype (Functor, Applicative, Monad, MonadTrans, MonadIO)
 
 instance MonadState s m => MonadState s (UnifyT t m) where
   get = lift get
