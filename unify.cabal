@@ -27,6 +27,7 @@ extra-source-files: CHANGELOG.md
 
 library
     exposed-modules:  Logic.Unify
+                    , Logic.Unify.Internal
     -- other-modules:
 
     -- LANGUAGE extensions used by modules in this package.

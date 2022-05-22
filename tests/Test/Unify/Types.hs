@@ -4,6 +4,7 @@ module Test.Unify.Types where
 
 import Control.Lens (Plated, children, transformM)
 import Data.Data (Data)
+import Data.Proxy
 import Logic.Unify
 
 data Term
@@ -21,3 +22,5 @@ instance Unifiable Term where
   transformTermM = transformM
   termChildren = children
 
+newMetavar :: Unify Term Term
+newMetavar = Var <$> newVar (Proxy :: Proxy Term)

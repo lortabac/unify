@@ -12,32 +12,32 @@ unificationTests =
     "Unification"
     [ testCase "var-const" $ do
         let res = evalUnify $ do
-              x <- Var <$> newVar
+              x <- newMetavar
               _ <- unify x (Int 1)
               applyBindings x
-        res @=? Just (Int 1),
+        res @=? Right (Int 1),
       testCase "mixed-const" $ do
         let res = evalUnify $ do
-              x <- Var <$> newVar
+              x <- newMetavar
               _ <- unify (F2 x (Int 2)) (F2 (Int 1) (Int 2))
               applyBindings x
-        res @=? Just (Int 1),
+        res @=? Right (Int 1),
       testCase "var-var" $ do
         let (v1, v2) = evalUnify $ do
-              x <- Var <$> newVar
-              y <- Var <$> newVar
+              x <- newMetavar
+              y <- newMetavar
               _ <- unify x y
               x' <- applyBindings x
               pure (x', y)
-        v1 @=? Just v2,
+        v1 @=? Right v2,
       testCase "aliasing" $ do
         let res = evalUnify $ do
-              x <- Var <$> newVar
-              y <- Var <$> newVar
+              x <- newMetavar
+              y <- newMetavar
               _ <- unify x y
               _ <- unify y (Int 1)
               applyBindings x
-        res @=? Just (Int 1),
+        res @=? Right (Int 1),
       testCase "const-const (fail)" $
         testUnificationFailure $
           unify (Int 1) (Int 2),
@@ -46,14 +46,14 @@ unificationTests =
           unify (F2 (Int 1) (Int 2)) (F2 (Int 1) (Int 3)),
       testCase "var-mixed (occurs)" $
         testOccursCheck $ do
-          x <- Var <$> newVar
+          x <- newMetavar
           unifyOccursCheck x (F1 x),
       testCase "var-const (lazy occurs)" $ do
         let res = evalUnify $ do
-              x <- Var <$> newVar
+              x <- newMetavar
               _ <- unify x (F1 x)
               applyBindings x
-        res @=? Nothing
+        res @=? Left (UVar 0)
     ]
 
 testUnificationFailure ::
